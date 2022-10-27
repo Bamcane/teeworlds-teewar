@@ -9,6 +9,7 @@ CLaser::CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEner
 {
 	m_Pos = Pos;
 	m_Owner = Owner;
+	m_Team = GameServer()->m_apPlayers[Owner]->GetTeam();
 	m_Energy = StartEnergy;
 	m_Dir = Direction;
 	m_Bounces = 0;
@@ -36,7 +37,7 @@ bool CLaser::Hit(vec2 From, vec2 To)
 		return true;
 	}
 
-	CTower *pHitTower = GameServer()->m_World.IntersectTower(m_Pos, To, 0.f, At, GameServer()->m_apPlayers[m_Owner]->GetTeam());
+	CTower *pHitTower = GameServer()->m_World.IntersectTower(m_Pos, To, 0.f, At, m_Team);
 	if(pHitTower)
 	{
 		m_From = From;

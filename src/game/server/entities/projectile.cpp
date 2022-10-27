@@ -13,6 +13,7 @@ CProjectile::CProjectile(CGameWorld *pGameWorld, int Type, int Owner, vec2 Pos, 
 	m_Direction = Dir;
 	m_LifeSpan = Span;
 	m_Owner = Owner;
+	m_Team = GameServer()->m_apPlayers[Owner]->GetTeam();
 	m_Force = Force;
 	m_Damage = Damage;
 	m_SoundImpact = SoundImpact;
@@ -65,7 +66,7 @@ void CProjectile::Tick()
 	CCharacter *OwnerChar = GameServer()->GetPlayerChar(m_Owner);
 	CCharacter *TargetChr = GameServer()->m_World.IntersectCharacter(PrevPos, CurPos, 6.0f, CurPos, OwnerChar);
 
-	CTower *TargetTower = GameServer()->m_World.IntersectTower(PrevPos, CurPos, 6.0f, CurPos, OwnerChar->GetPlayer()->GetTeam());
+	CTower *TargetTower = GameServer()->m_World.IntersectTower(PrevPos, CurPos, 6.0f, CurPos, m_Team);
 
 	m_LifeSpan--;
 
