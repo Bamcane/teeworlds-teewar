@@ -19,15 +19,13 @@ typedef unsigned __int64 uint64_t;
 		Controls the main game logic. Keeping track of team and player score,
 		winning conditions and specific game logic.
 */
-class IGameController
+class CGameController
 {
-	vec2 m_aaSpawnPoints[3][64];
-	int m_aNumSpawnPoints[3];
+	array<vec2> m_aaSpawnPoints[2];
 
 	class CGameContext *m_pGameServer;
 	class IServer *m_pServer;
 
-protected:
 	CGameContext *GameServer() const { return m_pGameServer; }
 	IServer *Server() const { return m_pServer; }
 
@@ -60,7 +58,10 @@ protected:
 	int m_GameOverTick;
 	int m_SuddenDeath;
 
+public:
 	int m_aTeamscore[2];
+	class CTower *m_apTeamTower[2];
+private:
 
 	int m_Warmup;
 	int m_UnpauseTimer;
@@ -76,8 +77,8 @@ public:
 	bool IsTeamplay() const;
 	bool IsGameOver() const { return m_GameOverTick != -1; }
 
-	IGameController(class CGameContext *pGameServer);
-	virtual ~IGameController();
+	CGameController(class CGameContext *pGameServer);
+	virtual ~CGameController();
 
 	virtual void DoWincheck();
 
@@ -113,7 +114,7 @@ public:
 		Returns:
 			bool?
 	*/
-	virtual bool OnEntity(const char* pName, vec2 Pivot, vec2 P0, vec2 P1, vec2 P2, vec2 P3, int PosEnv);
+	virtual bool OnEntity(int Index, vec2 Pos);
 
 	/*
 		Function: on_CCharacter_spawn

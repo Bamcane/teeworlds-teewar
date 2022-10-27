@@ -23,6 +23,8 @@ public:
 		ENTTYPE_PICKUP,
 		ENTTYPE_FLAG,
 		ENTTYPE_CHARACTER,
+
+		ENTTYPE_TOWER,
 		NUM_ENTTYPES
 	};
 
@@ -100,6 +102,22 @@ public:
 	*/
 	class CCharacter *ClosestCharacter(vec2 Pos, float Radius, CEntity *ppNotThis);
 
+	/*
+		Function: interserct_CCharacter
+			Finds the closest CCharacter that intersects the line.
+
+		Arguments:
+			pos0 - Start position
+			pos2 - End position
+			radius - How for from the line the CCharacter is allowed to be.
+			new_pos - Intersection position
+			notthis - not this team
+
+		Returns:
+			Returns a pointer to the closest hit or NULL of there is no intersection.
+	*/
+	class CTower *IntersectTower(vec2 Pos0, vec2 Pos1, float Radius, vec2 &NewPos, int NotThis);
+	
 	/*
 		Function: insert_entity
 			Adds an entity to the world.

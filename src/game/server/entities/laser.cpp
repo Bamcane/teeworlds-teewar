@@ -18,19 +18,36 @@ CLaser::CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEner
 }
 
 
-bool CLaser::HitCharacter(vec2 From, vec2 To)
+bool CLaser::Hit(vec2 From, vec2 To)
 {
 	vec2 At;
 	CCharacter *pOwnerChar = GameServer()->GetPlayerChar(m_Owner);
-	CCharacter *pHit = GameServer()->m_World.IntersectCharacter(m_Pos, To, 0.f, At, pOwnerChar);
-	if(!pHit)
-		return false;
+	int Damage = GameServer()->Tuning()->m_LaserDamage;
+	if(pOwnerChar && pOwnerChar->GetRole() == ROLE_SNIPER)
+		Damage *= 1.5;
 
-	m_From = From;
-	m_Pos = At;
-	m_Energy = -1;
-	pHit->TakeDamage(vec2(0.f, 0.f), GameServer()->Tuning()->m_LaserDamage, m_Owner, WEAPON_RIFLE);
-	return true;
+	CCharacter *pHit = GameServer()->m_World.IntersectCharacter(m_Pos, To, 0.f, At, pOwnerChar);
+	if(pHit)
+	{
+		m_From = From;
+		m_Pos = At;
+		m_Energy = -1;
+		pHit->TakeDamage(vec2(0.f, 0.f), Damage, m_Owner, WEAPON_RIFLE);
+		return true;
+	}
+
+	CTower *pHitTower = GameServer()->m_World.IntersectTower(m_Pos, To, 0.f, At, GameServer()->m_apPlayers[m_Owner]->GetTeam());
+	if(pHitTower)
+	{
+		m_From = From;
+		m_Pos = At;
+		m_Energy = -1;
+		GameServer()->CreatePlayerSpawn(At);
+		pHitTower->TakeDamage(Damage, m_Owner);
+		return true;
+	}
+	
+	return false;
 }
 
 void CLaser::DoBounce()
@@ -47,7 +64,7 @@ void CLaser::DoBounce()
 
 	if(GameServer()->Collision()->IntersectLine(m_Pos, To, 0x0, &To))
 	{
-		if(!HitCharacter(m_Pos, To))
+		if(!Hit(m_Pos, To))
 		{
 			// intersected
 			m_From = m_Pos;
@@ -71,7 +88,7 @@ void CLaser::DoBounce()
 	}
 	else
 	{
-		if(!HitCharacter(m_Pos, To))
+		if(!Hit(m_Pos, To))
 		{
 			m_From = m_Pos;
 			m_Pos = To;
@@ -98,7 +115,7 @@ void CLaser::TickPaused()
 
 void CLaser::Snap(int SnappingClient)
 {
-	if(NetworkClipped(SnappingClient))
+	if(NetworkClipped(SnappingClient) && SnappingClient != m_Owner)
 		return;
 
 	CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(Server()->SnapNewItem(NETOBJTYPE_LASER, m_ID, sizeof(CNetObj_Laser)));

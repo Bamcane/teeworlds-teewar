@@ -18,6 +18,7 @@ CPlayer::CPlayer(CGameContext *pGameServer, int ClientID, int Team)
 	m_pCharacter = 0;
 	m_ClientID = ClientID;
 	m_Team = GameServer()->m_pController->ClampTeam(Team);
+	m_Role = ROLE_NULL;
 	m_SpectatorID = SPEC_FREEVIEW;
 	m_LastActionTick = Server()->Tick();
 	m_TeamChangeTick = Server()->Tick();
@@ -305,6 +306,12 @@ void CPlayer::Respawn()
 
 void CPlayer::SetTeam(int Team, bool DoChatMsg)
 {
+	if(!m_Role)
+	{
+		GameServer()->CreateSoundGlobal(SOUND_CTF_DROP, m_ClientID);
+		GameServer()->SendBroadcast_VL(_("You must random role in the vote before join game"), m_ClientID, NULL);
+		return;
+	}
 	// clamp the team
 	Team = GameServer()->m_pController->ClampTeam(Team);
 	if(m_Team == Team)
@@ -322,9 +329,6 @@ void CPlayer::SetTeam(int Team, bool DoChatMsg)
 		}else if(Team == TEAM_BLUE && GameServer()->m_pController->IsTeamplay())
 		{
 			GameServer()->SendChatTarget(-1, _("'{str:Player}' joined the blueteam"),"Player", Server()->ClientName(m_ClientID));
-		}else
-		{
-			GameServer()->SendChatTarget(-1, _("'{str:Player}' joined the game"),"Player", Server()->ClientName(m_ClientID));
 		}
 	}
 
@@ -349,6 +353,30 @@ void CPlayer::SetTeam(int Team, bool DoChatMsg)
 				GameServer()->m_apPlayers[i]->m_SpectatorID = SPEC_FREEVIEW;
 		}
 	}
+}
+
+void CPlayer::AutoTeam()
+{
+	int Reds = 0, Blues = 0;
+	for(int i = 0;i < MAX_CLIENTS; i ++)
+	{
+		CPlayer *pPlayer = GameServer()->m_apPlayers[i];
+		if(pPlayer)
+		{
+			if(pPlayer->GetTeam() == TEAM_RED)
+				Reds++;
+			else if(pPlayer->GetTeam() == TEAM_BLUE)
+				Blues++;
+		}
+	}
+
+	if(Reds > Blues)
+		SetTeam(TEAM_BLUE);
+	else if(Reds < Blues)
+		SetTeam(TEAM_RED);
+	else SetTeam(random_int(TEAM_RED, TEAM_BLUE));
+
+	return;
 }
 
 void CPlayer::TryRespawn()

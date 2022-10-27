@@ -161,8 +161,80 @@
             "value": "'{str:Player}' 加入了红队"
         },
         {
-            "key": "'{str:Player}' joined the game",
-            "value": "'{str:Player}' 加入了游戏"
+            "key": "You must random role in the vote before join game",
+            "value": "在加入游戏之前你必须在投票里随机选择角色"
+        },
+        {
+            "key": "Teewar v{str:version} mod by EDreemurr",
+            "value": "Teewar v{str:version} 由EDreemurr制作"
+        },
+        {
+            "key": "Your role is: {str:Role}",
+            "value": "你的角色是: {str:Role}"
+        },
+        {
+            "key": "=====Role=====",
+            "value": "=====角色====="
+        },
+        {
+            "key": "Random Role",
+            "value": "随机角色"
+        },
+        {
+            "key": "| ====Mode====",
+            "value": "| ====模式===="
+        },
+        {
+            "key": "| Easy mode (100)",
+            "value": "| 简单 (100血)"
+        },
+        {
+            "key": "| Normal mode (200)",
+            "value": "| 普通 (200血)"
+        },
+        {
+            "key": "| Hard mode (300)",
+            "value": "| 困难 (300血)"
+        },
+        {
+            "key": "| Solar mode (1000)",
+            "value": "| 日蚀 (1000血)"
+        },
+        {
+            "key": "| War mode (5000)",
+            "value": "| 战争 (5000血)"
+        },
+        {
+            "key": "| Epic mode (10000)",
+            "value": "| 史诗 (10000血)"
+        },
+        {
+            "key": "Sniper",
+            "value": "狙击手"
+        },
+        {
+            "key": "Soldier",
+            "value": "战士"
+        },
+        {
+            "key": "Red team: {int:red}%\nBlue team: {int:blue}%",
+            "value": "红方: {int:red}%\n蓝方: {int:blue}%"
+        },
+        {
+            "key": "| Blue Team won this round!",
+            "value": "| 蓝方胜利!"
+        },
+        {
+            "key": "| Red Team won this round!",
+            "value": "| 红方胜利!"
+        },
+        {
+            "key": "| Warning:Blue tower is only {int:Health}% health!",
+            "value": "| 警告:蓝方塔只有{int:Health}%的血量!"
+        },
+        {
+            "key": "| Warning:Red tower is only {int:Health}% health!",
+            "value": "| 警告:红方塔只有{int:Health}%的血量!"
         }
     ]
 }

@@ -9,7 +9,7 @@
 #include <game/version.h>
 #include <game/collision.h>
 #include <game/gamecore.h>
-#include "gamemodes/mod.h"
+#include "gamecontroller.h"
 
 #include <teeuniverses/components/localization.h>
 
@@ -150,6 +150,22 @@ void CGameContext::CreateExplosion(vec2 Pos, int Owner, int Weapon, bool NoDamag
 			float Dmg = 6 * l;
 			if((int)Dmg)
 				apEnts[i]->TakeDamage(ForceDir*Dmg*2, (int)Dmg, Owner, Weapon);
+		}
+		// deal damage
+		CTower *apTowers[2];
+		apTowers[0] = m_pController->m_apTeamTower[0];
+		apTowers[1] = m_pController->m_apTeamTower[1];
+		for(int i = 0; i < 2; i++)
+		{
+			vec2 Diff = apTowers[i]->m_Pos - Pos;
+			vec2 ForceDir(0,1);
+			float l = length(Diff) - 128.0f;
+			if(l)
+				ForceDir = normalize(Diff);
+			l = 1-clamp((l-InnerRadius)/(Radius-InnerRadius), 0.0f, 1.0f);
+			float Dmg = 6 * l;
+			if((int)Dmg)
+				apTowers[i]->TakeDamage((int)Dmg, Owner);
 		}
 	}
 }
@@ -549,6 +565,12 @@ void CGameContext::OnTick()
 				EndVote();
 				SendChatTarget(-1, _("Vote passed"));
 
+				
+				if (str_find(m_aVoteCommand, "war_tower_health") != NULL)
+				{
+					m_pController->EndRound();
+				}
+
 				if(m_apPlayers[m_VoteCreator])
 					m_apPlayers[m_VoteCreator]->m_LastVoteCall = 0;
 			}
@@ -595,10 +617,13 @@ void CGameContext::OnClientPredictedInput(int ClientID, void *pInput)
 void CGameContext::OnClientEnter(int ClientID)
 {
 	//world.insert_entity(&players[client_id]);
+	InitVotes(ClientID);
 	m_apPlayers[ClientID]->Respawn();
 	char aBuf[512];
 	str_format(aBuf, sizeof(aBuf), "'%s' entered and joined the %s", Server()->ClientName(ClientID), m_pController->GetTeamName(m_apPlayers[ClientID]->GetTeam()));
 	SendChatTarget(-1, _("'{str:PlayerName}' entered and joined the game"),"PlayerName", Server()->ClientName(ClientID), NULL);
+
+	SendChatTarget(ClientID, _("Teewar v{str:version} mod by EDreemurr"), "version", MOD_VERSION, NULL);
 
 	str_format(aBuf, sizeof(aBuf), "team_join player='%d:%s' team=%d", ClientID, Server()->ClientName(ClientID), m_apPlayers[ClientID]->GetTeam());
 	Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
@@ -608,10 +633,7 @@ void CGameContext::OnClientEnter(int ClientID)
 
 void CGameContext::OnClientConnected(int ClientID)
 {
-	// Check which team the player should be on
-	const int StartTeam = g_Config.m_SvTournamentMode ? TEAM_SPECTATORS : m_pController->GetAutoTeam(ClientID);
-
-	m_apPlayers[ClientID] = new(ClientID) CPlayer(this, ClientID, StartTeam);
+	m_apPlayers[ClientID] = new(ClientID) CPlayer(this, ClientID, TEAM_SPECTATORS);
 	//players[client_id].init(client_id);
 	//players[client_id].client_id = client_id;
 
@@ -749,27 +771,6 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 
 			int64 Now = Server()->Tick();
 			pPlayer->m_LastVoteTry = Now;
-			if(pPlayer->GetTeam() == TEAM_SPECTATORS)
-			{
-				SendChatTarget(ClientID, _("Spectators aren't allowed to start a vote."));
-				return;
-			}
-
-			if(m_VoteCloseTime)
-			{
-				SendChatTarget(ClientID, _("Wait for current vote to end before calling a new one."));
-				return;
-			}
-
-			int Timeleft = pPlayer->m_LastVoteCall + Server()->TickSpeed()*60 - Now;
-			if(pPlayer->m_LastVoteCall && Timeleft > 0)
-			{
-				char aChatmsg[512] = {0};
-				int Seconds = (Timeleft/Server()->TickSpeed())+1;
-				str_format(aChatmsg, sizeof(aChatmsg), _("You must wait %d seconds before making another vote"), Seconds);
-				SendChatTarget(ClientID, _("You must wait {int}:Time} seconds before making another vote"), "Time", &Seconds, NULL);
-				return;
-			}
 
 			char aChatmsg[512] = {0};
 			char aDesc[VOTE_DESC_LENGTH] = {0};
@@ -780,30 +781,40 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 
 			if(str_comp_nocase(pMsg->m_Type, "option") == 0)
 			{
-				CVoteOptionServer *pOption = m_pVoteOptionFirst;
-				while(pOption)
+				for(int i = 0; i < m_PlayerVotes[ClientID].size(); ++i)
 				{
-					if(str_comp_nocase(pMsg->m_Value, pOption->m_aDescription) == 0)
+					if(str_comp_nocase(pMsg->m_Value, m_PlayerVotes[ClientID][i].m_aDescription) == 0)
 					{
-						str_format(aChatmsg, sizeof(aChatmsg), "'%s' called vote to change server option '%s' (%s)", Server()->ClientName(ClientID),
-									pOption->m_aDescription, pReason);
-						SendChatTarget(-1, _("'{str:PlayerName}' called vote to change server option '{str:Option}' ({str:Reason})"), "PlayerName",
-									Server()->ClientName(ClientID), "Option", pOption->m_aDescription,
-									"Reason", pReason, NULL);
+						str_format(aDesc, sizeof(aDesc), "%s", m_PlayerVotes[ClientID][i].m_aDescription);
+						str_format(aCmd, sizeof(aCmd), "%s", m_PlayerVotes[ClientID][i].m_aCommand);
+
+						if(m_VoteCloseTime && str_comp_nocase(aCmd, "random_role"))
+						{
+							SendChatTarget(ClientID, _("Wait for current vote to end before calling a new one."));
+							return;
+						}
+						
+						if(str_comp_nocase(aCmd, "random_role"))
+							SendChatTarget(-1, _("'{str:PlayerName}' called vote to change server option '{str:Option}' ({str:Reason})"), "PlayerName",
+										Server()->ClientName(ClientID), "Option", m_PlayerVotes[ClientID][i].m_aDescription,
+										"Reason", pReason );
+						else
+						{
+							int Role = random_int(ROLE_SNIPER, NUM_ROLES-1);
+
+							SendChatTarget(pPlayer->GetCID(), _("Your role is: {str:Role}"), "Role",
+							Localize(pPlayer->GetLanguage(), GetRoleName(Role)), NULL);
+
+							SendBroadcast_VL(_("Your role is: {str:Role}"), pPlayer->GetCID(), "Role",
+							Localize(pPlayer->GetLanguage(), GetRoleName(Role)), NULL);
+							pPlayer->SetRole(Role);
+							pPlayer->AutoTeam();
+							return;
+						}
 						m_ChatTarget = true;
-						str_format(aDesc, sizeof(aDesc), "%s", pOption->m_aDescription);
-						str_format(aCmd, sizeof(aCmd), "%s", pOption->m_aCommand);
+						m_PlayerVotes[ClientID][i].data;
 						break;
 					}
-
-					pOption = pOption->m_pNext;
-				}
-
-				if(!pOption)
-				{
-					str_format(aChatmsg, sizeof(aChatmsg), "'%s' isn't an option on this server", pMsg->m_Value);
-					SendChatTarget(ClientID, _("'{str:Option}' isn't an option on this server"), "Option", pMsg->m_Value);
-					return;
 				}
 			}
 			else if(str_comp_nocase(pMsg->m_Type, "kick") == 0)
@@ -1550,26 +1561,12 @@ void CGameContext::ConchainSpecialMotdupdate(IConsole::IResult *pResult, void *p
 void CGameContext::ConAbout(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext* pThis = (CGameContext*) pUserData;
+
+	int ClientID = pResult->GetClientID();
 	
-	char aBuf[256];
-	str_format(aBuf, sizeof(aBuf), "%s %s by %s", MOD_NAME, MOD_VERSION, MOD_AUTHORS);
-	pThis->Console()->Print(IConsole::OUTPUT_LEVEL_CHAT, "chat", aBuf);
-	
-	if(MOD_CREDITS[0])
-	{
-		str_format(aBuf, sizeof(aBuf), "Credits: %s", MOD_CREDITS);
-		pThis->Console()->Print(IConsole::OUTPUT_LEVEL_CHAT, "chat", aBuf);
-	}
-	if(MOD_THANKS[0])
-	{
-		str_format(aBuf, sizeof(aBuf), "Thanks to: %s", MOD_THANKS);
-		pThis->Console()->Print(IConsole::OUTPUT_LEVEL_CHAT, "chat", aBuf);
-	}
-	if(MOD_SOURCES[0])
-	{
-		str_format(aBuf, sizeof(aBuf), "Sources: %s", MOD_SOURCES);
-		pThis->Console()->Print(IConsole::OUTPUT_LEVEL_CHAT, "chat", aBuf);
-	}
+	pThis->SendChatTarget(ClientID, _("Teewar v{str:version} mod by EDreemurr"), "version", MOD_VERSION, NULL);
+
+	return;
 }
 
 void CGameContext::ConLanguage(IConsole::IResult *pResult, void *pUserData)
@@ -1639,6 +1636,89 @@ void CGameContext::SetClientLanguage(int ClientID, const char *pLanguage)
 	}
 }
 
+void CGameContext::SendDamageSound(int ClientID)
+{
+	CreateSoundGlobal(SOUND_CTF_GRAB_PL, ClientID);
+	return;
+}
+
+// MMOTee
+void CGameContext::AddVote(const char *Desc, const char *Cmd, int ClientID)
+{
+	while(*Desc && *Desc == ' ')
+		Desc++;
+
+	if(ClientID == -2)
+		return;
+
+	CVoteOptions Vote;	
+	str_copy(Vote.m_aDescription, Desc, sizeof(Vote.m_aDescription));
+	str_copy(Vote.m_aCommand, Cmd, sizeof(Vote.m_aCommand));
+	m_PlayerVotes[ClientID].add(Vote);
+	
+	// inform clients about added option
+	CNetMsg_Sv_VoteOptionAdd OptionMsg;	
+	OptionMsg.m_pDescription = Vote.m_aDescription;
+	Server()->SendPackMsg(&OptionMsg, MSGFLAG_VITAL, ClientID);
+}
+
+void CGameContext::AddVote_VL(int To, const char* aCmd, const char* pText, ...)
+{
+	int Start = (To < 0 ? 0 : To);
+	int End = (To < 0 ? MAX_CLIENTS : To+1);
+	
+	dynamic_string Buffer;
+	
+	va_list VarArgs;
+	va_start(VarArgs, pText);
+
+	for(int i = Start; i < End; i++)
+	{
+		if(m_apPlayers[i])
+		{
+			Buffer.clear();
+			Server()->Localization()->Format_VL(Buffer, m_apPlayers[i]->GetLanguage(), pText, VarArgs);
+			AddVote(Buffer.buffer(), aCmd, i);
+		}
+	}
+	
+	Buffer.clear();
+	va_end(VarArgs);
+}
+
+void CGameContext::InitVotes(int ClientID)
+{
+	const char *pLanguageCode = m_apPlayers[ClientID]->GetLanguage();
+
+	AddVote_VL(ClientID, "roles", Localize(pLanguageCode, "| ====Role===="), NULL);
+	AddVote_VL(ClientID, "random_role",  Localize(pLanguageCode, "| Random Role"), NULL);
+	AddVote_VL(ClientID, "modes", Localize(pLanguageCode, "| ====Mode===="), NULL);
+	AddVote_VL(ClientID, "war_tower_health 100",  Localize(pLanguageCode, "| Easy mode (100)"), NULL);
+	AddVote_VL(ClientID, "war_tower_health 200",  Localize(pLanguageCode, "| Normal mode (200)"), NULL);
+	AddVote_VL(ClientID, "war_tower_health 300",  Localize(pLanguageCode, "| Hard mode (300)"), NULL);
+	AddVote_VL(ClientID, "war_tower_health 1000",  Localize(pLanguageCode, "| Solar mode (1000)"), NULL);
+	AddVote_VL(ClientID, "war_tower_health 5000",  Localize(pLanguageCode, "| War mode (5000)"), NULL);
+	AddVote_VL(ClientID, "war_tower_health 10000",  Localize(pLanguageCode, "| Epic mode (10000)"), NULL);
+}
+
+const char *CGameContext::GetRoleName(int Role)
+{
+	switch (Role)
+	{
+		case ROLE_SNIPER:
+			return "Sniper";
+			break;
+		default:
+			return "Null";
+			break;
+	}
+}
+
+const char *CGameContext::Localize(const char* pLanguageCode, const char* pText)
+{
+	return Server()->Localization()->Localize(pLanguageCode, pText);
+}
+
 void CGameContext::ConsoleOutputCallback_Chat(const char *pLine, void *pUser)
 {
 	CGameContext *pSelf = (CGameContext *)pUser;
@@ -1687,10 +1767,7 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("shuffle_teams", "", CFGFLAG_SERVER, ConShuffleTeams, this, "Shuffle the current teams");
 	Console()->Register("lock_teams", "", CFGFLAG_SERVER, ConLockTeams, this, "Lock/unlock teams");
 
-	Console()->Register("add_vote", "sr", CFGFLAG_SERVER, ConAddVote, this, "Add a voting option");
-	Console()->Register("remove_vote", "s", CFGFLAG_SERVER, ConRemoveVote, this, "remove a voting option");
 	Console()->Register("force_vote", "ss?r", CFGFLAG_SERVER, ConForceVote, this, "Force a voting option");
-	Console()->Register("clear_votes", "", CFGFLAG_SERVER, ConClearVotes, this, "Clears the voting options");
 	Console()->Register("vote", "r", CFGFLAG_SERVER, ConVote, this, "Force a vote to yes/no");
 	
 	Console()->Register("about", "", CFGFLAG_CHAT, ConAbout, this, "Show information about the mod");
@@ -1715,15 +1792,12 @@ void CGameContext::OnInit(/*class IKernel *pKernel*/)
 	m_Layers.Init(Kernel());
 	m_Collision.Init(&m_Layers);
 
-	//Get zones
-	m_ZoneHandle_TeeWorlds = m_Collision.GetZoneHandle("teeworlds");
-
 	// reset everything here
 	//world = new GAMEWORLD;
 	//players = new CPlayer[MAX_CLIENTS];
 
 	// select gametype
-	m_pController = new CGameControllerMOD(this);
+	m_pController = new CGameController(this);
 
 	// setup core world
 	//for(int i = 0; i < MAX_CLIENTS; i++)
@@ -1750,82 +1824,11 @@ void CGameContext::OnInit(/*class IKernel *pKernel*/)
 
 			if(Index >= ENTITY_OFFSET)
 			{
-				vec2 Pivot(x*32.0f+16.0f, y*32.0f+16.0f);
-				vec2 P0(x*32.0f, y*32.0f);
-				vec2 P1((x+1)*32.0f, y*32.0f);
-				vec2 P2(x*32.0f, (y+1)*32.0f);
-				vec2 P3((x+1)*32.0f, (y+1)*32.0f);
-				switch(Index - ENTITY_OFFSET)
-				{
-					case ENTITY_SPAWN:
-						m_pController->OnEntity("spawn", Pivot, P0, P1, P2, P3, -1);
-						break;
-					case ENTITY_SPAWN_RED:
-						m_pController->OnEntity("redSpawn", Pivot, P0, P1, P2, P3, -1);
-						break;
-					case ENTITY_SPAWN_BLUE:
-						m_pController->OnEntity("buleSpawn", Pivot, P0, P1, P2, P3, -1);
-						break;
-					case ENTITY_FLAGSTAND_RED:
-						m_pController->OnEntity("redFlag", Pivot, P0, P1, P2, P3, -1);
-						break;
-					case ENTITY_FLAGSTAND_BLUE:
-						m_pController->OnEntity("buleFlag", Pivot, P0, P1, P2, P3, -1);
-						break;
-					case ENTITY_ARMOR:
-						m_pController->OnEntity("armor", Pivot, P0, P1, P2, P3, -1);
-						break;
-					case ENTITY_HEALTH:
-						m_pController->OnEntity("health", Pivot, P0, P1, P2, P3, -1);
-						break;
-					case ENTITY_WEAPON_SHOTGUN:
-						m_pController->OnEntity("shotgun", Pivot, P0, P1, P2, P3, -1);
-						break;
-					case ENTITY_WEAPON_GRENADE:
-						m_pController->OnEntity("grenade", Pivot, P0, P1, P2, P3, -1);
-						break;
-					case ENTITY_POWERUP_NINJA:
-						m_pController->OnEntity("ninja", Pivot, P0, P1, P2, P3, -1);
-						break;
-					case ENTITY_WEAPON_RIFLE:
-						m_pController->OnEntity("rifle", Pivot, P0, P1, P2, P3, -1);
-						break;
-				}
+				vec2 Pos(x*32.0f+16.0f, y*32.0f+16.0f);
+				m_pController->OnEntity(Index-ENTITY_OFFSET, Pos);
 			}
 		}
 	}
-
-	// create all entities from entity layers
-	if(m_Layers.EntityGroup())
-	{
-		char aLayerName[12];
-
-		const CMapItemGroup* pGroup = m_Layers.EntityGroup();
-		for(int l = 0; l < pGroup->m_NumLayers; l++)
-		{
-			CMapItemLayer *pLayer = m_Layers.GetLayer(pGroup->m_StartLayer+l);
-			if(pLayer->m_Type == LAYERTYPE_QUADS)
-			{
-				CMapItemLayerQuads *pQLayer = (CMapItemLayerQuads *)pLayer;
-
-				IntsToStr(pQLayer->m_aName, sizeof(aLayerName)/sizeof(int), aLayerName);
-
-				const CQuad *pQuads = (const CQuad *) Kernel()->RequestInterface<IMap>()->GetDataSwapped(pQLayer->m_Data);
-
-				for(int q = 0; q < pQLayer->m_NumQuads; q++)
-				{
-					vec2 P0(fx2f(pQuads[q].m_aPoints[0].x), fx2f(pQuads[q].m_aPoints[0].y));
-					vec2 P1(fx2f(pQuads[q].m_aPoints[1].x), fx2f(pQuads[q].m_aPoints[1].y));
-					vec2 P2(fx2f(pQuads[q].m_aPoints[2].x), fx2f(pQuads[q].m_aPoints[2].y));
-					vec2 P3(fx2f(pQuads[q].m_aPoints[3].x), fx2f(pQuads[q].m_aPoints[3].y));
-					vec2 Pivot(fx2f(pQuads[q].m_aPoints[4].x), fx2f(pQuads[q].m_aPoints[4].y));
-
-					m_pController->OnEntity(aLayerName, Pivot, P0, P1, P2, P3, pQuads[q].m_PosEnv);
-				}
-			}
-		}
-	}
-
 	//game.world.insert_entity(game.Controller);
 
 #ifdef CONF_DEBUG

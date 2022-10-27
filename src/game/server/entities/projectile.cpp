@@ -65,9 +65,11 @@ void CProjectile::Tick()
 	CCharacter *OwnerChar = GameServer()->GetPlayerChar(m_Owner);
 	CCharacter *TargetChr = GameServer()->m_World.IntersectCharacter(PrevPos, CurPos, 6.0f, CurPos, OwnerChar);
 
+	CTower *TargetTower = GameServer()->m_World.IntersectTower(PrevPos, CurPos, 6.0f, CurPos, OwnerChar->GetPlayer()->GetTeam());
+
 	m_LifeSpan--;
 
-	if(TargetChr || Collide || m_LifeSpan < 0 || GameLayerClipped(CurPos))
+	if(TargetChr || TargetTower || Collide || m_LifeSpan < 0 || GameLayerClipped(CurPos))
 	{
 		if(m_LifeSpan >= 0 || m_Weapon == WEAPON_GRENADE)
 			GameServer()->CreateSound(CurPos, m_SoundImpact);
@@ -77,6 +79,9 @@ void CProjectile::Tick()
 
 		else if(TargetChr)
 			TargetChr->TakeDamage(m_Direction * max(0.001f, m_Force), m_Damage, m_Owner, m_Weapon);
+
+		else if(TargetTower)
+			TargetTower->TakeDamage(m_Damage, m_Owner);
 
 		GameServer()->m_World.DestroyEntity(this);
 	}

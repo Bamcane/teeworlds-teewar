@@ -225,6 +225,35 @@ CCharacter *CGameWorld::IntersectCharacter(vec2 Pos0, vec2 Pos1, float Radius, v
 	return pClosest;
 }
 
+CTower *CGameWorld::IntersectTower(vec2 Pos0, vec2 Pos1, float Radius, vec2& NewPos, int NotThis)
+{
+	// Find other players
+	float ClosestLen = distance(Pos0, Pos1) * 100.0f;
+	CTower *pClosest = 0;
+
+	CTower *p = (CTower *)FindFirst(ENTTYPE_TOWER);
+	for(; p; p = (CTower *)p->TypeNext())
+ 	{
+		if(p->m_Team == NotThis)
+			continue;
+
+		vec2 IntersectPos = closest_point_on_line(Pos0, Pos1, p->m_Pos);
+		float Len = distance(p->m_Pos, IntersectPos);
+		if(Len < p->m_ProximityRadius+Radius)
+		{
+			Len = distance(Pos0, IntersectPos);
+			if(Len < ClosestLen)
+			{
+				NewPos = IntersectPos;
+				ClosestLen = Len;
+				pClosest = p;
+			}
+		}
+	}
+
+	return pClosest;
+}
+
 bool distCompare(std::pair<float,int> a, std::pair<float,int> b)
 {
 	return (a.first < b.first);

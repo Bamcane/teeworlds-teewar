@@ -70,6 +70,7 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 	GameServer()->m_World.m_Core.m_apCharacters[m_pPlayer->GetCID()] = &m_Core;
 
 	m_ReckoningTick = 0;
+	m_LastFixTick = 0;
 	mem_zero(&m_SendCore, sizeof(m_SendCore));
 	mem_zero(&m_ReckoningCore, sizeof(m_ReckoningCore));
 
@@ -254,6 +255,9 @@ void CCharacter::FireWeapon()
 	if(m_ActiveWeapon == WEAPON_GRENADE || m_ActiveWeapon == WEAPON_SHOTGUN || m_ActiveWeapon == WEAPON_RIFLE)
 		FullAuto = true;
 
+	// Soldier can auto hammer
+	if(m_ActiveWeapon == WEAPON_HAMMER && GetRole() == ROLE_SOLDIER)
+		FullAuto = true;
 
 	// check if we gonna fire
 	bool WillFire = false;
@@ -269,14 +273,29 @@ void CCharacter::FireWeapon()
 	// check for ammo
 	if(!m_aWeapons[m_ActiveWeapon].m_Ammo)
 	{
-		// 125ms is a magical limit of how fast a human can click
-		m_ReloadTimer = 125 * Server()->TickSpeed() / 1000;
-		if(m_LastNoAmmoSound+Server()->TickSpeed() <= Server()->Tick())
+		if(!m_RoleAmmoRegen)
 		{
-			GameServer()->CreateSound(m_Pos, SOUND_WEAPON_NOAMMO);
-			m_LastNoAmmoSound = Server()->Tick();
+			
+			if(GetRole() == ROLE_SNIPER && m_aWeapons[WEAPON_RIFLE].m_Ammo == 0 && m_Armor >= 5)
+			{
+				m_RoleAmmoRegen = g_Config.m_WarSniperAmmoregen;
+				m_Armor -= 5;
+				SetEmote(EMOTE_HAPPY, Server()->Tick() + m_RoleAmmoRegen);
+				GameServer()->SendEmoticon(m_pPlayer->GetCID(), EMOTICON_EYES);
+				return; 
+			}
+			SetEmote(EMOTE_ANGRY, Server()->Tick() + 1500 * Server()->TickSpeed() / 1000);
+			GameServer()->SendEmoticon(m_pPlayer->GetCID(), EMOTICON_SUSHI);
+		
+			// 125ms is a magical limit of how fast a human can click
+			m_ReloadTimer = 125 * Server()->TickSpeed() / 1000;
+			if(m_LastNoAmmoSound+Server()->TickSpeed() <= Server()->Tick())
+			{
+				GameServer()->CreateSound(m_Pos, SOUND_WEAPON_NOAMMO);
+				m_LastNoAmmoSound = Server()->Tick();
+			}
+			return;
 		}
-		return;
 	}
 
 	vec2 ProjStartPos = m_Pos+Direction*m_ProximityRadius*0.75f;
@@ -316,6 +335,15 @@ void CCharacter::FireWeapon()
 				pTarget->TakeDamage(vec2(0.f, -1.f) + normalize(Dir + vec2(0.f, -1.1f)) * 10.0f, g_pData->m_Weapons.m_Hammer.m_pBase->m_Damage,
 					m_pPlayer->GetCID(), m_ActiveWeapon);
 				Hits++;
+			}
+
+			CTower *pTower = GameServer()->m_pController->m_apTeamTower[(m_pPlayer->GetTeam() ? TEAM_RED : TEAM_BLUE)];
+
+			// Attack the tower, if random 1
+			if((distance(pTower->m_Pos, ProjStartPos) < m_ProximityRadius + pTower->m_ProximityRadius) && (GetRole() == ROLE_SOLDIER || random_int(0, 1)))
+			{
+				pTower->TakeDamage(1, m_pPlayer->GetCID());
+				GameServer()->CreateHammerHit(ProjStartPos);
 			}
 
 			// if we Hit anything, we have to wait for the reload
@@ -372,7 +400,12 @@ void CCharacter::FireWeapon()
 
 		case WEAPON_RIFLE:
 		{
-			new CLaser(GameWorld(), m_Pos, Direction, GameServer()->Tuning()->m_LaserReach, m_pPlayer->GetCID());
+			float Reach = GameServer()->Tuning()->m_LaserReach;
+			if(GetRole() == ROLE_SNIPER) // sniper's laser reach
+			{
+				Reach *= 1.5;
+			}
+			new CLaser(GameWorld(), m_Pos, Direction, Reach, m_pPlayer->GetCID());
 			GameServer()->CreateSound(m_Pos, SOUND_RIFLE_FIRE);
 		} break;
 
@@ -413,6 +446,20 @@ void CCharacter::HandleWeapons()
 
 	// fire Weapon, if wanted
 	FireWeapon();
+
+	if(m_RoleAmmoRegen)
+	{
+		if(!(m_RoleAmmoRegen % 10))
+			GameServer()->CreateSound(m_Pos, SOUND_WEAPON_NOAMMO);
+
+		m_RoleAmmoRegen--;
+
+		if(!m_RoleAmmoRegen)
+		{
+			if(GetRole() == ROLE_SNIPER)
+				m_aWeapons[WEAPON_RIFLE].m_Ammo = 10;
+		}
+	}
 
 	// ammo regen
 	int AmmoRegenTime = g_pData->m_Weapons.m_aId[m_ActiveWeapon].m_Ammoregentime;
@@ -533,16 +580,6 @@ void CCharacter::Tick()
 		GameServer()->Collision()->GetCollisionAt(m_Pos.x+m_ProximityRadius/3.f, m_Pos.y+m_ProximityRadius/3.f)&CCollision::COLFLAG_DEATH ||
 		GameServer()->Collision()->GetCollisionAt(m_Pos.x-m_ProximityRadius/3.f, m_Pos.y-m_ProximityRadius/3.f)&CCollision::COLFLAG_DEATH ||
 		GameServer()->Collision()->GetCollisionAt(m_Pos.x-m_ProximityRadius/3.f, m_Pos.y+m_ProximityRadius/3.f)&CCollision::COLFLAG_DEATH ||
-		GameLayerClipped(m_Pos))
-	{
-		Die(m_pPlayer->GetCID(), WEAPON_WORLD);
-	}
-
-	// handle death-zones
-	if(GameServer()->Collision()->GetZoneValueAt(GameServer()->m_ZoneHandle_TeeWorlds, m_Pos.x+m_ProximityRadius/3.f, m_Pos.y-m_ProximityRadius/3.f) == TILE_DEATH ||
-		GameServer()->Collision()->GetZoneValueAt(GameServer()->m_ZoneHandle_TeeWorlds, m_Pos.x+m_ProximityRadius/3.f, m_Pos.y+m_ProximityRadius/3.f) == TILE_DEATH ||
-		GameServer()->Collision()->GetZoneValueAt(GameServer()->m_ZoneHandle_TeeWorlds, m_Pos.x-m_ProximityRadius/3.f, m_Pos.y-m_ProximityRadius/3.f) == TILE_DEATH ||
-		GameServer()->Collision()->GetZoneValueAt(GameServer()->m_ZoneHandle_TeeWorlds, m_Pos.x-m_ProximityRadius/3.f, m_Pos.y+m_ProximityRadius/3.f) == TILE_DEATH ||
 		GameLayerClipped(m_Pos))
 	{
 		Die(m_pPlayer->GetCID(), WEAPON_WORLD);
@@ -708,8 +745,8 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 	if(GameServer()->m_pController->IsFriendlyFire(m_pPlayer->GetCID(), From) && !g_Config.m_SvTeamdamage)
 		return false;
 
-	// m_pPlayer only inflicts half damage on self
-	if(From == m_pPlayer->GetCID())
+	// Player only inflicts half damage on self, if player is soldier half damage too
+	if(From == m_pPlayer->GetCID() || GetRole() == ROLE_SOLDIER)
 		Dmg = max(1, Dmg/2);
 
 	m_DamageTaken++;
@@ -863,4 +900,9 @@ void CCharacter::Snap(int SnappingClient)
 	}
 
 	pCharacter->m_PlayerFlags = GetPlayer()->m_PlayerFlags;
+}
+
+int CCharacter::GetRole()
+{
+	return m_pPlayer->GetRole();
 }

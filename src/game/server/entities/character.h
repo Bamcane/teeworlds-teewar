@@ -9,6 +9,8 @@
 
 #include <game/gamecore.h>
 
+#include "tower.h"
+
 enum
 {
 	WEAPON_GAME = -3, // team switching etc
@@ -130,6 +132,13 @@ private:
 	int m_ReckoningTick; // tick that we are performing dead reckoning From
 	CCharacterCore m_SendCore; // core that we should send
 	CCharacterCore m_ReckoningCore; // the dead reckoning core
+
+	int m_RoleAmmoRegen;
+public:
+	CNetObj_PlayerInput GetInput() { return m_Input; }
+	int GetActiveWeapon() {return m_ActiveWeapon; }
+	int GetRole();
+	int m_LastFixTick;
 
 };
 

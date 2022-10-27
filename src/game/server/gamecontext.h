@@ -17,6 +17,8 @@
 #include "gameworld.h"
 #include "player.h"
 
+#include "define.h"
+
 #ifdef _MSC_VER
 typedef __int32 int32_t;
 typedef unsigned __int32 uint32_t;
@@ -88,8 +90,6 @@ class CGameContext : public IGameServer
 public:
 	int m_ChatResponseTargetID;
 	int m_ChatPrintCBIndex;
-public:
-	int m_ZoneHandle_TeeWorlds;
 
 public:
 	IServer *Server() const { return m_pServer; }
@@ -106,7 +106,7 @@ public:
 	CEventHandler m_Events;
 	CPlayer *m_apPlayers[MAX_CLIENTS];
 
-	IGameController *m_pController;
+	CGameController *m_pController;
 	CGameWorld m_World;
 
 	// helper functions
@@ -139,6 +139,14 @@ public:
 	CHeap *m_pVoteOptionHeap;
 	CVoteOptionServer *m_pVoteOptionFirst;
 	CVoteOptionServer *m_pVoteOptionLast;
+	// MMOTee
+	struct CVoteOptions
+	{
+		char m_aDescription[VOTE_DESC_LENGTH] = { 0 };
+		char m_aCommand[VOTE_CMD_LENGTH] = { 0 };
+		void* data = { 0 };
+	};
+	array<CVoteOptions> m_PlayerVotes[MAX_CLIENTS];
 
 	// helper functions
 	void CreateDamageInd(vec2 Pos, float AngleMod, int Amount, int64_t Mask=-1LL);
@@ -167,6 +175,16 @@ public:
 	void SendBroadcast(const char *pText, int ClientID);
 	void SendBroadcast_VL(const char *pText, int ClientID, ...);
 	void SetClientLanguage(int ClientID, const char *pLanguage);
+
+	void SendDamageSound(int ClientID);
+	// MMOTee
+	void AddVote_VL(int To, const char* aCmd, const char* pText, ...);
+	void AddVote(const char *Desc, const char *Cmd, int ClientID = -1);
+
+	void InitVotes(int ClientID);
+	const char *GetRoleName(int Role);
+
+	const char *Localize(const char* pLanguageCode, const char* pText);
 
 
 

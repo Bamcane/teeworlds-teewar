@@ -123,7 +123,12 @@ private:
 
 	void HandleTuningParams(); //This function will send the new parameters if needed
 
+	int m_Role;
 public:
+	int GetRole(){ return m_Role;}
+	void SetRole(int Role){ m_Role = Role;}
+	void AutoTeam();
+
 	CTuningParams* GetNextTuningParams() { return &m_NextTuningParams; };
 };
 
