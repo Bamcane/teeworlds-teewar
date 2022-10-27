@@ -1717,6 +1717,9 @@ const char *CGameContext::GetRoleName(int Role)
 		case ROLE_SNIPER:
 			return "Sniper";
 			break;
+		case ROLE_SOLDIER:
+			return "Soldier";
+			break;
 		default:
 			return "Null";
 			break;
