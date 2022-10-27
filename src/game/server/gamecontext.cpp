@@ -1699,6 +1699,15 @@ void CGameContext::InitVotes(int ClientID)
 	AddVote_VL(ClientID, "war_tower_health 1000",  Localize(pLanguageCode, "| Solar mode (1000)"), NULL);
 	AddVote_VL(ClientID, "war_tower_health 5000",  Localize(pLanguageCode, "| War mode (5000)"), NULL);
 	AddVote_VL(ClientID, "war_tower_health 10000",  Localize(pLanguageCode, "| Epic mode (10000)"), NULL);
+	AddVote_VL(ClientID, "map",  Localize(pLanguageCode, "| ====Map====="), NULL);
+	AddVote_VL(ClientID, "change_map ctf1",  Localize(pLanguageCode, "| ctf1"), NULL);
+	AddVote_VL(ClientID, "change_map ctf2",  Localize(pLanguageCode, "| ctf2"), NULL);
+	AddVote_VL(ClientID, "change_map ctf3",  Localize(pLanguageCode, "| ctf3"), NULL);
+	AddVote_VL(ClientID, "change_map ctf4",  Localize(pLanguageCode, "| ctf4"), NULL);
+	AddVote_VL(ClientID, "change_map ctf5",  Localize(pLanguageCode, "| ctf5"), NULL);
+	AddVote_VL(ClientID, "change_map ctf6",  Localize(pLanguageCode, "| ctf6"), NULL);
+	AddVote_VL(ClientID, "change_map ctf7",  Localize(pLanguageCode, "| ctf7"), NULL);
+
 }
 
 const char *CGameContext::GetRoleName(int Role)
