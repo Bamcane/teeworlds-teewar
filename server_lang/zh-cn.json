@@ -221,8 +221,12 @@
             "value": "战士"
         },
         {
-            "key": "Red team: {int:red}%\nBlue team: {int:blue}%",
-            "value": "红方: {int:red}%\n蓝方: {int:blue}%"
+            "key": "Engineer",
+            "value": "工程师"
+        },
+        {
+            "key": "| No Team won this round!",
+            "value": "| 没有任何人胜利!"
         },
         {
             "key": "| Blue Team won this round!",
@@ -233,12 +237,8 @@
             "value": "| 红方胜利!"
         },
         {
-            "key": "| Warning:Blue tower is only {int:Health}% health!",
-            "value": "| 警告:蓝方塔只有{int:Health}%的血量!"
-        },
-        {
-            "key": "| Warning:Red tower is only {int:Health}% health!",
-            "value": "| 警告:红方塔只有{int:Health}%的血量!"
+            "key": "Laser Armor: {int:Num}",
+            "value": "激光护盾: {int:Num}次"
         }
     ]
 }

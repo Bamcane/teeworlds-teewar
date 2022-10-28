@@ -361,7 +361,7 @@ void CPlayer::AutoTeam()
 	for(int i = 0;i < MAX_CLIENTS; i ++)
 	{
 		CPlayer *pPlayer = GameServer()->m_apPlayers[i];
-		if(pPlayer)
+		if(pPlayer && pPlayer != this)
 		{
 			if(pPlayer->GetTeam() == TEAM_RED)
 				Reds++;
@@ -375,6 +375,9 @@ void CPlayer::AutoTeam()
 	else if(Reds < Blues)
 		SetTeam(TEAM_RED);
 	else SetTeam(random_int(TEAM_RED, TEAM_BLUE));
+
+	if(m_pCharacter)
+		KillCharacter();
 
 	return;
 }

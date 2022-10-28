@@ -4,19 +4,21 @@
 #define GAME_VARIABLES_H
 #undef GAME_VARIABLES_H // this file will be included several times
 
+MACRO_CONFIG_STR(SvMaprotation, sv_maprotation, 768, "ctf1 ctf2 ctf3 ctf4 ctf5 ctf6 ctf7"
+	, CFGFLAG_SERVER, "Maps to rotate between")
+
 MACRO_CONFIG_INT(WarSniperAmmoregen, war_sniper_ammoregen, 75, 25, 100, CFGFLAG_SERVER, "Sniper ammoregen times")
 
 MACRO_CONFIG_INT(WarTowerHealth, war_tower_health, 300, 100, 10000, CFGFLAG_SERVER, "Tower's Healths")
 MACRO_CONFIG_INT(WarHammerFixHealth, war_hammer_fixhealth, 5, 5, 50, CFGFLAG_SERVER, "Hammer Fix Healths")
-MACRO_CONFIG_INT(WarHammerFixTimer, war_hammer_fixtimer, 75, 50, 1000, CFGFLAG_SERVER, "Hammer Fix Timer")
+MACRO_CONFIG_INT(WarFixTimer, war_fix_timer, 75, 50, 1000, CFGFLAG_SERVER, "Fix Timer")
 
 // server
 MACRO_CONFIG_INT(SvRestartTimer, sv_restart_timer, 3, 1, 10, CFGFLAG_SERVER, "Number of seconds before round starts")
 MACRO_CONFIG_INT(SvUnpauseTimer, sv_unpause_timer, 0, 0, 0, CFGFLAG_SERVER, "Number of seconds till the game continues")
 MACRO_CONFIG_STR(SvMotd, sv_motd, 900, "", CFGFLAG_SERVER, "Message of the day to display for the clients")
 MACRO_CONFIG_INT(SvTeamdamage, sv_teamdamage, 0, 0, 1, CFGFLAG_SERVER, "Team damage")
-MACRO_CONFIG_STR(SvMaprotation, sv_maprotation, 768, "", CFGFLAG_SERVER, "Maps to rotate between")
-MACRO_CONFIG_INT(SvRoundsPerMap, sv_rounds_per_map, 1, 1, 100, CFGFLAG_SERVER, "Number of rounds on each map before rotating")
+MACRO_CONFIG_INT(SvRoundsPerMap, sv_rounds_per_map, 8, 1, 100, CFGFLAG_SERVER, "Number of rounds on each map before rotating")
 MACRO_CONFIG_INT(SvRoundSwap, sv_round_swap, 1, 0, 1, CFGFLAG_SERVER, "Swap teams between rounds")
 MACRO_CONFIG_INT(SvPowerups, sv_powerups, 1, 0, 1, CFGFLAG_SERVER, "Allow powerups like ninja")
 MACRO_CONFIG_INT(SvScorelimit, sv_scorelimit, 20, 0, 1000, CFGFLAG_SERVER, "Score limit (0 disables)")

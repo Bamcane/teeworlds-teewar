@@ -45,6 +45,13 @@ CCharacter::CCharacter(CGameWorld *pWorld)
 	m_ProximityRadius = ms_PhysSize;
 	m_Health = 0;
 	m_Armor = 0;
+
+	m_LaserID = Server()->SnapNewID();
+}
+
+CCharacter::~CCharacter()
+{
+	Server()->SnapFreeID(m_LaserID);
 }
 
 void CCharacter::Reset()
@@ -76,6 +83,9 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 
 	GameServer()->m_World.InsertEntity(this);
 	m_Alive = true;
+
+	m_FireTeam = -1;// Enginner
+
 
 	GameServer()->m_pController->OnCharacterSpawn(this);
 
@@ -259,6 +269,10 @@ void CCharacter::FireWeapon()
 	if(m_ActiveWeapon == WEAPON_HAMMER && GetRole() == ROLE_SOLDIER)
 		FullAuto = true;
 
+	// Engineer can auto gun
+	if(m_ActiveWeapon == WEAPON_GUN && GetRole() == ROLE_ENGINEER)
+		FullAuto = true;
+
 	// check if we gonna fire
 	bool WillFire = false;
 	if(CountInput(m_LatestPrevInput.m_Fire, m_LatestInput.m_Fire).m_Presses)
@@ -299,6 +313,8 @@ void CCharacter::FireWeapon()
 	}
 
 	vec2 ProjStartPos = m_Pos+Direction*m_ProximityRadius*0.75f;
+
+	m_AttackTick = Server()->Tick();
 
 	switch(m_ActiveWeapon)
 	{
@@ -354,6 +370,12 @@ void CCharacter::FireWeapon()
 
 		case WEAPON_GUN:
 		{
+			if(GetRole() == ROLE_ENGINEER)
+			{
+				GameServer()->CreateSound(m_Pos, SOUND_PLAYER_JUMP);
+				return;
+			}
+
 			CProjectile *pProj = new CProjectile(GameWorld(), WEAPON_GUN,
 				m_pPlayer->GetCID(),
 				ProjStartPos,
@@ -423,8 +445,6 @@ void CCharacter::FireWeapon()
 
 	}
 
-	m_AttackTick = Server()->Tick();
-
 	if(m_aWeapons[m_ActiveWeapon].m_Ammo > 0) // -1 == unlimited
 		m_aWeapons[m_ActiveWeapon].m_Ammo--;
 
@@ -463,7 +483,7 @@ void CCharacter::HandleWeapons()
 
 	// ammo regen
 	int AmmoRegenTime = g_pData->m_Weapons.m_aId[m_ActiveWeapon].m_Ammoregentime;
-	if(AmmoRegenTime)
+	if(AmmoRegenTime && !(m_ActiveWeapon == WEAPON_GUN && GetRole() == ROLE_ENGINEER))
 	{
 		// If equipped and not active, regen ammo?
 		if (m_ReloadTimer <= 0)
@@ -571,6 +591,8 @@ void CCharacter::Tick()
 
 		m_pPlayer->m_ForceBalanced = false;
 	}
+	
+	UpdateTuning();
 
 	m_Core.m_Input = m_Input;
 	m_Core.Tick(true, m_pPlayer->GetNextTuningParams());
@@ -584,6 +606,8 @@ void CCharacter::Tick()
 	{
 		Die(m_pPlayer->GetCID(), WEAPON_WORLD);
 	}
+
+	m_FireTeam = -1;
 
 	// handle Weapons
 	HandleWeapons();
@@ -712,12 +736,15 @@ void CCharacter::Die(int Killer, int Weapon)
 	m_pPlayer->m_RespawnTick = Server()->Tick()+Server()->TickSpeed()/2;
 	int ModeSpecial = GameServer()->m_pController->OnCharacterDeath(this, GameServer()->m_apPlayers[Killer], Weapon);
 
-	char aBuf[256];
-	str_format(aBuf, sizeof(aBuf), "kill killer='%d:%s' victim='%d:%s' weapon=%d special=%d",
-		Killer, Server()->ClientName(Killer),
-		m_pPlayer->GetCID(), Server()->ClientName(m_pPlayer->GetCID()), Weapon, ModeSpecial);
-	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
-
+	if(Killer >= 0)
+	{
+		char aBuf[256];
+		str_format(aBuf, sizeof(aBuf), "kill killer='%d:%s' victim='%d:%s' weapon=%d special=%d",
+			Killer, Server()->ClientName(Killer),
+			m_pPlayer->GetCID(), Server()->ClientName(m_pPlayer->GetCID()), Weapon, ModeSpecial);
+		GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
+	}
+	
 	// send the kill message
 	CNetMsg_Sv_KillMsg Msg;
 	Msg.m_Killer = Killer;
@@ -805,8 +832,6 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 	// check for death
 	if(m_Health <= 0)
 	{
-		Die(From, Weapon);
-
 		// set attacker's face to happy (taunt!)
 		if (From >= 0 && From != m_pPlayer->GetCID() && GameServer()->m_apPlayers[From])
 		{
@@ -818,6 +843,7 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 			}
 		}
 
+		Die(From, Weapon);
 		return false;
 	}
 
@@ -900,6 +926,33 @@ void CCharacter::Snap(int SnappingClient)
 	}
 
 	pCharacter->m_PlayerFlags = GetPlayer()->m_PlayerFlags;
+
+	if(GetRole() == ROLE_ENGINEER && m_FireTeam > -1)
+	{
+		CNetObj_Laser *pLaser = (CNetObj_Laser *)Server()->SnapNewItem(NETOBJTYPE_LASER, m_LaserID, sizeof(CNetObj_Laser));
+
+		if(!pLaser)
+			return;
+
+		vec2 TowerPos = GameServer()->m_pController->m_apTeamTower[m_FireTeam]->m_Pos;
+
+		pLaser->m_FromX = m_Pos.x;
+		pLaser->m_FromY = m_Pos.y;
+		pLaser->m_X = TowerPos.x;
+		pLaser->m_Y = TowerPos.y;
+		pLaser->m_StartTick = Server()->Tick();
+	}
+}
+
+void CCharacter::UpdateTuning()
+{
+	CTuningParams *pTuning = m_pPlayer->GetNextTuningParams();
+
+	if(GetRole() == ROLE_SNIPER)
+	{
+		pTuning->m_GroundControlSpeed = (int)(pTuning->m_GroundControlSpeed * 1.5);
+		pTuning->m_AirControlSpeed = (int)(pTuning->m_AirControlSpeed * 1.5);
+	}
 }
 
 int CCharacter::GetRole()

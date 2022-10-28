@@ -27,6 +27,7 @@ public:
 	static const int ms_PhysSize = 28;
 
 	CCharacter(CGameWorld *pWorld);
+	~CCharacter();
 
 	virtual void Reset();
 	virtual void Destroy();
@@ -112,10 +113,12 @@ private:
 	int m_Jumped;
 
 	int m_DamageTakenTick;
+public:
 
 	int m_Health;
 	int m_Armor;
 
+private:
 	// ninja
 	struct
 	{
@@ -134,11 +137,16 @@ private:
 	CCharacterCore m_ReckoningCore; // the dead reckoning core
 
 	int m_RoleAmmoRegen;
+
+	int m_LaserID;// Engineer
+
+	void UpdateTuning();
 public:
 	CNetObj_PlayerInput GetInput() { return m_Input; }
 	int GetActiveWeapon() {return m_ActiveWeapon; }
 	int GetRole();
 	int m_LastFixTick;
+	int m_FireTeam;// Engineer
 
 };
 

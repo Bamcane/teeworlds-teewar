@@ -524,7 +524,7 @@ void CGameContext::OnTick()
 				bool aVoteChecked[MAX_CLIENTS] = {0};
 				for(int i = 0; i < MAX_CLIENTS; i++)
 				{
-					if(!m_apPlayers[i] || m_apPlayers[i]->GetTeam() == TEAM_SPECTATORS || aVoteChecked[i])	// don't count in votes by spectators
+					if(!m_apPlayers[i] || aVoteChecked[i])	// don't count in votes by spectators
 						continue;
 
 					int ActVote = m_apPlayers[i]->m_Vote;
@@ -766,7 +766,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 		}
 		else if(MsgID == NETMSGTYPE_CL_CALLVOTE)
 		{
-			if(g_Config.m_SvSpamprotection && pPlayer->m_LastVoteTry && pPlayer->m_LastVoteTry+Server()->TickSpeed()*3 > Server()->Tick())
+			if(g_Config.m_SvSpamprotection  && pPlayer->m_LastVoteTry && pPlayer->m_LastVoteTry+Server()->TickSpeed() > Server()->Tick())
 				return;
 
 			int64 Now = Server()->Tick();
@@ -1719,6 +1719,9 @@ const char *CGameContext::GetRoleName(int Role)
 			break;
 		case ROLE_SOLDIER:
 			return "Soldier";
+			break;
+		case ROLE_ENGINEER:
+			return "Engineer";
 			break;
 		default:
 			return "Null";

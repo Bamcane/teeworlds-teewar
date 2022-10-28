@@ -10,7 +10,6 @@ CTower::CTower(CGameWorld *pGameWorld, vec2 Pos, int Team)
 {
 	m_Team = Team;
     m_Pos = Pos;
-    m_LastWarningTick = 0;
 
     Reset();
 
@@ -32,6 +31,13 @@ CTower::~CTower()
 
 void CTower::TakeDamage(int Damage, int From)
 {
+    CPlayer *pPlayer = GameServer()->m_apPlayers[From];
+    if(pPlayer && pPlayer->GetTeam() == m_Team)
+        return;
+
+    if((From == CLIENTID_BLUE && m_Team) || (From == CLIENTID_RED && !m_Team))
+        return;
+
     m_TowerHealth -= Damage;
 
     if(m_TowerHealth <= 0)
@@ -46,20 +52,6 @@ void CTower::TakeDamage(int Damage, int From)
         return;
     }
 
-    int Health = m_TowerHealth * 100 / g_Config.m_WarTowerHealth;
-    if(Health < 5 && m_LastWarningTick + Server()->TickSpeed()/2 <= Server()->Tick())
-    {
-        if(m_Team)
-        {
-            GameServer()->SendChatTarget(-1, 
-                _("| Warning:Blue tower is only {int:Health}% health!"), "Health", &Health);
-        }else 
-        {
-            GameServer()->SendChatTarget(-1, 
-                _("| Warning:Red tower is only {int:Health}% health!"), "Health", &Health);
-        }
-        m_LastWarningTick = Server()->Tick();
-    }
     return;
 }
 
@@ -73,8 +65,20 @@ void CTower::TakeFix(int Health, int From)
     return;
 }
 
+void CTower::UpdateState()
+{
+    m_TowerState = TOWERSTATE_ARMOR;
+
+    if(m_LaserArmor)
+    {
+        m_TowerState |= TOWERSTATE_LASER;
+    }
+}
+
 void CTower::Tick()
 {
+    UpdateState();
+
     if(m_TowerHealth <= 0 && m_DestoryTick > 0)
     {
         m_DestoryTick--;
@@ -108,17 +112,71 @@ void CTower::Tick()
             CCharacter *pTarget = apEnts[i];
             CNetObj_PlayerInput Input = pTarget->GetInput();
 
-            if(Input.m_Fire&1 && (pTarget->m_LastFixTick + g_Config.m_WarHammerFixTimer <= Server()->Tick())
-                && pTarget->GetActiveWeapon() == WEAPON_HAMMER && 
-                    pTarget->GetPlayer()->GetTeam() == m_Team)
-                TakeFix(g_Config.m_WarHammerFixHealth, pTarget->GetPlayer()->GetCID());
+            int FixTimer = g_Config.m_WarFixTimer;
+
+            if(pTarget->GetRole() == ROLE_ENGINEER && pTarget->GetActiveWeapon() == WEAPON_GUN)
+            {
+                FixTimer /= 5;
+            }
+
+            if(Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_GUN && pTarget->m_Armor)
+                pTarget->m_FireTeam = m_Team;
+
+            if((pTarget->m_LastFixTick + FixTimer <= Server()->Tick()))
+            {
+                int CID = pTarget->GetPlayer()->GetCID();
+                if(pTarget->GetPlayer()->GetTeam() == m_Team && Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_HAMMER)
+                {
+                    int Health = g_Config.m_WarHammerFixHealth;
+                    if(pTarget->GetRole() == ROLE_ENGINEER)
+                        Health *= 2;
+                    
+                    TakeFix(Health, CID);
+                }else if(Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_GUN && pTarget->m_Armor)
+                {
+                    if(pTarget->GetPlayer()->GetTeam() == m_Team)
+                    {
+                        pTarget->m_Armor--;
+                        m_GiveArmor++;
+                        if(m_GiveArmor >= 10)
+                        {
+                            m_LaserArmor += 2;
+                            m_GiveArmor = 0;
+                            GameServer()->SendChatTarget(CID, _("Laser Armor: {int:Num}"), "Num", &m_LaserArmor, NULL);
+                        }
+                    }
+                    else 
+                    {
+                        if(m_LaserArmor)
+                        {
+                            m_GiveArmor--;
+                            if(m_GiveArmor < -5)
+                            {
+                                m_LaserArmor--;
+                                m_GiveArmor = 0;
+                                GameServer()->SendChatTarget(CID, _("Laser Armor: {int:Num}"), "Num", &m_LaserArmor, NULL);
+                            }
+                        }else
+                        {
+                            TakeDamage(2, CID);
+                        }
+                    }
+                }
+                pTarget->m_LastFixTick = Server()->Tick();
+            }
+            
         }
     }
 }
 
 void CTower::Reset()
 {
+    m_TowerState = TOWERSTATE_ARMOR;
     m_TowerHealth = g_Config.m_WarTowerHealth;
+
+    m_LaserArmor = 0;
+    m_GiveArmor = 0;
+    
 	m_ProximityRadius = ms_PhysSize;
     m_DestoryTick = -1;
 }
@@ -143,14 +201,29 @@ void CTower::Snap(int SnappingClient)
     {
 		vec2 Pos = m_Pos + (GetDir(Degres*pi/180) * Radius);
 
-        CNetObj_Pickup *pArmor = (CNetObj_Pickup *)Server()->SnapNewItem(NETOBJTYPE_PICKUP, m_ArmorIDs[i], sizeof(CNetObj_Pickup));
-        if(!pArmor)
-            return;
-        
-        pArmor->m_X = Pos.x;
-        pArmor->m_Y = Pos.y;
-        pArmor->m_Type = POWERUP_ARMOR;
-        pArmor->m_Subtype = 0;
+        if(m_TowerState&TOWERSTATE_LASER)
+        {
+            vec2 To = m_Pos + (GetDir((Degres - 360 / NUM_ARMORS)*pi/180) * Radius);
+            CNetObj_Laser *pLaser = (CNetObj_Laser *)Server()->SnapNewItem(NETOBJTYPE_LASER, m_ArmorIDs[i], sizeof(CNetObj_Laser));
+            if(!pLaser)
+                return;
+            
+            pLaser->m_X = Pos.x;
+            pLaser->m_Y = Pos.y;
+            pLaser->m_FromX = To.x;
+            pLaser->m_FromY = To.y;
+            pLaser->m_StartTick = Server()->Tick();
+        }else
+        {
+            CNetObj_Pickup *pArmor = (CNetObj_Pickup *)Server()->SnapNewItem(NETOBJTYPE_PICKUP, m_ArmorIDs[i], sizeof(CNetObj_Pickup));
+            if(!pArmor)
+                return;
+            
+            pArmor->m_X = Pos.x;
+            pArmor->m_Y = Pos.y;
+            pArmor->m_Type = POWERUP_ARMOR;
+            pArmor->m_Subtype = 0;
+        }
 
         Degres -= 360 / NUM_ARMORS;
     }

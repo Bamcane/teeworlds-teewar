@@ -25,7 +25,7 @@ bool CLaser::Hit(vec2 From, vec2 To)
 	CCharacter *pOwnerChar = GameServer()->GetPlayerChar(m_Owner);
 	int Damage = GameServer()->Tuning()->m_LaserDamage;
 	if(pOwnerChar && pOwnerChar->GetRole() == ROLE_SNIPER)
-		Damage *= 1.5;
+		Damage *= 3;
 
 	CCharacter *pHit = GameServer()->m_World.IntersectCharacter(m_Pos, To, 0.f, At, pOwnerChar);
 	if(pHit)
