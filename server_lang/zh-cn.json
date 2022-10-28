@@ -173,12 +173,12 @@
             "value": "你的角色是: {str:Role}"
         },
         {
-            "key": "=====Role=====",
-            "value": "=====角色====="
+            "key": "| =====Role=====",
+            "value": "| =====角色====="
         },
         {
-            "key": "Random Role",
-            "value": "随机角色"
+            "key": "| Random Role",
+            "value": "| 随机角色"
         },
         {
             "key": "| ====Mode====",
