@@ -359,7 +359,9 @@ void CGameController::OnCharacterSpawn(class CCharacter *pChr)
 
 	// give default weapons
 	pChr->GiveWeapon(WEAPON_HAMMER, -1);
-	pChr->GiveWeapon(WEAPON_GUN, 10);
+	if(pChr->GetRole() == ROLE_ENGINEER)
+		pChr->GiveWeapon(WEAPON_GUN, -1);
+	else pChr->GiveWeapon(WEAPON_GUN, 10);
 
 	if(pChr->GetRole() == ROLE_SNIPER)
 		pChr->GiveWeapon(WEAPON_RIFLE, 5);
@@ -733,19 +735,34 @@ void CGameController::DoWincheck()
 			EndRound();
 			return;
 		}
+		bool Blue=0, Red=0;
 		for(int i = 0;i < 2;i ++)
 		{
-			if(m_apTeamTower[1-i]->m_TowerHealth <= 0 && m_apTeamTower[1-i]->m_DestoryTick == 0)
+			if(m_apTeamTower[i]->m_TowerHealth <= 0)
 			{
 				if(i)
-					GameServer()->SendChatTarget(-1, _("| Blue Team won this round!"), NULL);
+					Blue = true;
 				else
-					GameServer()->SendChatTarget(-1, _("| Red Team won this round!"), NULL);
-				m_aTeamscore[i] += 10;
-				EndRound();
-				return;
+					Red = true;
 			}
 		}
+
+		if(Blue && Red)
+		{
+			GameServer()->SendChatTarget(-1, _("| No Team won this round!"), NULL);
+			EndRound();
+		}else if(Blue && m_apTeamTower[TEAM_BLUE]->m_DestoryTick == 0)
+		{
+			GameServer()->SendChatTarget(-1, _("| Red Team won this round!"), NULL);
+			EndRound();
+			m_aTeamscore[TEAM_RED] += 10;
+		}else if(Red && m_apTeamTower[TEAM_RED]->m_DestoryTick == 0)
+		{
+			GameServer()->SendChatTarget(-1, _("| Blue Team won this round!"), NULL);
+			EndRound();
+			m_aTeamscore[TEAM_BLUE] += 10;
+		}
+
 	}
 }
 

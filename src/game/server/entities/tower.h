@@ -14,9 +14,12 @@ public:
 
 	int m_Team;
     int m_TowerHealth;
+	int m_TowerState;
+	
+	int m_LaserArmor;
+	int m_GiveArmor;
 
     int m_DestoryTick;
-	int m_LastWarningTick;
 
     int m_ArmorIDs[NUM_ARMORS];
 
@@ -25,6 +28,8 @@ public:
 
 	void TakeDamage(int Damage, int From);
 	void TakeFix(int Health, int From);
+
+	void UpdateState();
 
     virtual void Tick();
 	virtual void Reset();

@@ -10,6 +10,7 @@ public:
 		int Damage, bool Explosive, float Force, int SoundImpact, int Weapon);
 
 	vec2 GetPos(float Time);
+	void DoBounce();
 	void FillInfo(CNetObj_Projectile *pProj);
 
 	virtual void Reset();
@@ -19,6 +20,7 @@ public:
 
 private:
 	vec2 m_Direction;
+	int m_StartLifeSpan;
 	int m_LifeSpan;
 	int m_Owner;
 	int m_Team;
