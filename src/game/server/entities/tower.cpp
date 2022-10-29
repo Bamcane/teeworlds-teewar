@@ -119,7 +119,7 @@ void CTower::Tick()
                 FixTimer /= 5;
             }
 
-            if(Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_GUN && pTarget->m_Armor)
+            if(Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_GUN)
                 pTarget->m_FireTeam = m_Team;
 
             if((pTarget->m_LastFixTick + FixTimer <= Server()->Tick()))
@@ -132,20 +132,22 @@ void CTower::Tick()
                         Health *= 2;
                     
                     TakeFix(Health, CID);
-                }else if(Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_GUN && pTarget->m_Armor)
+                }else if(Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_GUN)
                 {
-                    if(pTarget->GetPlayer()->GetTeam() == m_Team)
+                    if(pTarget->GetPlayer()->GetTeam() == m_Team && pTarget->m_Armor)
                     {
                         pTarget->m_Armor--;
                         m_GiveArmor++;
+                        GameServer()->CreateSound(m_Pos, SOUND_PICKUP_ARMOR);
                         if(m_GiveArmor >= 10)
                         {
                             m_LaserArmor += 2;
                             m_GiveArmor = 0;
+                            GameServer()->CreateSound(m_Pos, SOUND_RIFLE_FIRE);
                             GameServer()->SendChatTarget(CID, _("Laser Armor: {int:Num}"), "Num", &m_LaserArmor, NULL);
                         }
                     }
-                    else 
+                    else if(pTarget->GetPlayer()->GetTeam() != m_Team)
                     {
                         if(m_LaserArmor)
                         {
