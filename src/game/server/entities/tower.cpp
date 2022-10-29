@@ -103,6 +103,9 @@ void CTower::Tick()
         m_ProximityRadius -= ms_PhysSize / (float)Server()->TickSpeed();
     }else if(m_TowerHealth)
     {
+        if(m_LaserArmor && Server()->Tick() % (Server()->TickSpeed() * 20) == 0)
+            m_LaserArmor--;
+
         CCharacter *apEnts[MAX_CLIENTS];
         int Num = GameServer()->m_World.FindEntities(m_Pos, m_ProximityRadius + 28.0f, (CEntity**)apEnts,
                                                     MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
