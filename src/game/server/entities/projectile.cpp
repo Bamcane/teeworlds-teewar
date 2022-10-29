@@ -74,10 +74,7 @@ void CProjectile::Tick()
 	if(TargetChr || TargetTower || Collide || m_LifeSpan < 0 || GameLayerClipped(CurPos))
 	{
 		if(TargetTower && TargetTower->m_TowerState&TOWERSTATE_LASER)
-		{
 			DoBounce();
-			TargetTower->m_LaserArmor--;
-		}
 		else 
 		{
 			if(m_LifeSpan >= 0 || m_Weapon == WEAPON_GRENADE)
