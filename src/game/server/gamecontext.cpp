@@ -347,7 +347,7 @@ void CGameContext::SendBroadcast_VL(const char *pText, int ClientID, ...)
 	dynamic_string Buffer;
 	
 	va_list VarArgs;
-	va_start(VarArgs, pText);
+	va_start(VarArgs, ClientID);
 	
 	// only for server demo record
 	if(ClientID < 0)

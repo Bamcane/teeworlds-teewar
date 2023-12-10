@@ -82,7 +82,7 @@ void CTower::Tick()
     if(m_TowerHealth <= 0 && m_DestoryTick > 0)
     {
         m_DestoryTick--;
-        if(random_prob(0.1f))
+        if(random_prob(0.4f))
         {
             float RandomRadius = random_float()*(m_ProximityRadius-4.0f);
 			float RandomAngle = 2.0f * pi * random_float();

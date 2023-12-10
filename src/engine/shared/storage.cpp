@@ -158,14 +158,14 @@ public:
 	void FindDatadir(const char *pArgv0)
 	{
 		// 1) use data-dir in PWD if present
-		if(fs_is_dir("data/mapres"))
+		if(fs_is_dir("data/maps"))
 		{
 			str_copy(m_aDatadir, "data", sizeof(m_aDatadir));
 			return;
 		}
 
 		// 2) use compiled-in data-dir if present
-		if(fs_is_dir(DATA_DIR "/mapres"))
+		if(fs_is_dir(DATA_DIR "/maps"))
 		{
 			str_copy(m_aDatadir, DATA_DIR, sizeof(m_aDatadir));
 			return;
@@ -183,7 +183,7 @@ public:
 				char aBaseDir[MAX_PATH_LENGTH];
 				str_copy(aBaseDir, pArgv0, Pos+1);
 				str_format(m_aDatadir, sizeof(m_aDatadir), "%s/data", aBaseDir);
-				str_append(aBaseDir, "/data/mapres", sizeof(aBaseDir));
+				str_append(aBaseDir, "/data/maps", sizeof(aBaseDir));
 
 				if(fs_is_dir(aBaseDir))
 					return;
@@ -208,7 +208,7 @@ public:
 			for (i = 0; i < DirsCount; i++)
 			{
 				char aBuf[128];
-				str_format(aBuf, sizeof(aBuf), "%s/mapres", aDirs[i]);
+				str_format(aBuf, sizeof(aBuf), "%s/maps", aDirs[i]);
 				if(fs_is_dir(aBuf))
 				{
 					str_copy(m_aDatadir, aDirs[i], sizeof(m_aDatadir));
