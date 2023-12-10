@@ -612,7 +612,7 @@ void CGameController::Snap(int SnappingClient)
 	pGameInfoObj->m_RoundStartTick = m_RoundStartTick;
 	pGameInfoObj->m_WarmupTimer = GameServer()->m_World.m_Paused ? m_UnpauseTimer : m_Warmup;
 
-	pGameInfoObj->m_ScoreLimit = g_Config.m_SvScorelimit;
+	pGameInfoObj->m_ScoreLimit = 0;
 	pGameInfoObj->m_TimeLimit = g_Config.m_SvTimelimit;
 
 	pGameInfoObj->m_RoundNum = (str_length(g_Config.m_SvMaprotation) && g_Config.m_SvRoundsPerMap) ? g_Config.m_SvRoundsPerMap : 0;
