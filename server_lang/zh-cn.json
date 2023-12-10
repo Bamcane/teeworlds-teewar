@@ -165,8 +165,8 @@
             "value": "在加入游戏之前你必须在投票里随机选择角色"
         },
         {
-            "key": "Teewar v{str:version} mod by EDreemurr",
-            "value": "Teewar v{str:version} 由EDreemurr制作"
+            "key": "Teewar v{str:version} mod by Bamcane",
+            "value": "Teewar v{str:version} 由甘竹Bamcane制作"
         },
         {
             "key": "Your role is: {str:Role}",
