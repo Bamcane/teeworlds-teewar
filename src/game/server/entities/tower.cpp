@@ -75,103 +75,116 @@ void CTower::UpdateState()
     }
 }
 
+void CTower::OnDestory()
+{
+    if(m_TowerHealth > 0 || m_DestoryTick <= 0)
+        return;
+
+    m_DestoryTick--;
+    if(random_prob(0.4f))
+    {
+        float RandomRadius = random_float()*(m_ProximityRadius-4.0f);
+        float RandomAngle = 2.0f * pi * random_float();
+        vec2 BoomPos = m_Pos + vec2(RandomRadius * cos(RandomAngle), RandomRadius * sin(RandomAngle));
+
+        GameServer()->CreateExplosion(BoomPos, -1, WEAPON_GRENADE, true);
+        GameServer()->CreateSound(BoomPos, SOUND_GRENADE_EXPLODE);
+    }
+
+    if(random_prob(0.1f))
+    {
+        float RandomRadius = random_float()*(m_ProximityRadius-4.0f);
+        float RandomAngle = 2.0f * pi * random_float();
+        vec2 SmokePos = m_Pos + vec2(RandomRadius * cos(RandomAngle), RandomRadius * sin(RandomAngle));
+
+        GameServer()->CreatePlayerSpawn(SmokePos);
+    }
+    m_ProximityRadius -= ms_PhysSize / (float)Server()->TickSpeed();
+}
+
+void CTower::OnNormal()
+{
+    if(m_TowerHealth <= 0)
+        return;
+
+    if(m_LaserArmor && Server()->Tick() % (Server()->TickSpeed() * 20) == 0)
+        m_LaserArmor--;
+
+    OnFix();
+}
+
+void CTower::OnFix()
+{
+    CCharacter *apEnts[MAX_CLIENTS];
+    int Num = GameServer()->m_World.FindEntities(m_Pos, m_ProximityRadius + 28.0f, (CEntity**)apEnts,
+                                                MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
+    for (int i = 0; i < Num; ++i)
+    {
+        CCharacter *pTarget = apEnts[i];
+        CNetObj_PlayerInput Input = pTarget->GetInput();
+
+        int FixTimer = g_Config.m_WarFixTimer;
+
+        if(pTarget->GetRole() == ROLE_ENGINEER && pTarget->GetActiveWeapon() == WEAPON_GUN)
+        {
+            FixTimer /= 5;
+        }
+
+        if(Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_GUN)
+            pTarget->m_FireTeam = m_Team;
+
+        if((pTarget->m_LastFixTick + FixTimer <= Server()->Tick()) && pTarget->GetRole() == ROLE_ENGINEER)
+        {
+            int CID = pTarget->GetPlayer()->GetCID();
+            if(pTarget->GetPlayer()->GetTeam() == m_Team && Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_HAMMER)
+            {
+                int Health = g_Config.m_WarHammerFixHealth;
+                
+                TakeFix(Health, CID);
+            }else if(Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_GUN)
+            {
+                if(pTarget->GetPlayer()->GetTeam() == m_Team && pTarget->m_Armor)
+                {
+                    pTarget->m_Armor--;
+                    m_GiveArmor++;
+                    GameServer()->CreateSound(m_Pos, SOUND_PICKUP_ARMOR);
+                    if(m_GiveArmor >= 10)
+                    {
+                        m_LaserArmor += 2;
+                        m_GiveArmor = 0;
+                        GameServer()->CreateSound(m_Pos, SOUND_RIFLE_FIRE);
+                        GameServer()->SendChatTarget(CID, _("Laser Armor: {int:Num}"), "Num", &m_LaserArmor, NULL);
+                    }
+                }
+                else if(pTarget->GetPlayer()->GetTeam() != m_Team)
+                {
+                    if(m_LaserArmor)
+                    {
+                        m_GiveArmor--;
+                        if(m_GiveArmor < -5)
+                        {
+                            m_LaserArmor--;
+                            m_GiveArmor = 0;
+                            GameServer()->SendChatTarget(CID, _("Laser Armor: {int:Num}"), "Num", &m_LaserArmor, NULL);
+                        }
+                    }else
+                    {
+                        TakeDamage(2, CID);
+                    }
+                }
+            }
+            pTarget->m_LastFixTick = Server()->Tick();
+        }
+    }
+}
+
 void CTower::Tick()
 {
     UpdateState();
 
-    if(m_TowerHealth <= 0 && m_DestoryTick > 0)
-    {
-        m_DestoryTick--;
-        if(random_prob(0.4f))
-        {
-            float RandomRadius = random_float()*(m_ProximityRadius-4.0f);
-			float RandomAngle = 2.0f * pi * random_float();
-			vec2 BoomPos = m_Pos + vec2(RandomRadius * cos(RandomAngle), RandomRadius * sin(RandomAngle));
-
-            GameServer()->CreateExplosion(BoomPos, -1, WEAPON_GRENADE, true);
-            GameServer()->CreateSound(BoomPos, SOUND_GRENADE_EXPLODE);
-        }
-
-        if(random_prob(0.1f))
-        {
-            float RandomRadius = random_float()*(m_ProximityRadius-4.0f);
-			float RandomAngle = 2.0f * pi * random_float();
-			vec2 SmokePos = m_Pos + vec2(RandomRadius * cos(RandomAngle), RandomRadius * sin(RandomAngle));
-
-            GameServer()->CreatePlayerSpawn(SmokePos);
-        }
-        m_ProximityRadius -= ms_PhysSize / (float)Server()->TickSpeed();
-    }else if(m_TowerHealth)
-    {
-        if(m_LaserArmor && Server()->Tick() % (Server()->TickSpeed() * 20) == 0)
-            m_LaserArmor--;
-
-        CCharacter *apEnts[MAX_CLIENTS];
-        int Num = GameServer()->m_World.FindEntities(m_Pos, m_ProximityRadius + 28.0f, (CEntity**)apEnts,
-                                                    MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
-
-        for (int i = 0; i < Num; ++i)
-        {
-            CCharacter *pTarget = apEnts[i];
-            CNetObj_PlayerInput Input = pTarget->GetInput();
-
-            int FixTimer = g_Config.m_WarFixTimer;
-
-            if(pTarget->GetRole() == ROLE_ENGINEER && pTarget->GetActiveWeapon() == WEAPON_GUN)
-            {
-                FixTimer /= 5;
-            }
-
-            if(Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_GUN)
-                pTarget->m_FireTeam = m_Team;
-
-            if((pTarget->m_LastFixTick + FixTimer <= Server()->Tick()))
-            {
-                int CID = pTarget->GetPlayer()->GetCID();
-                if(pTarget->GetPlayer()->GetTeam() == m_Team && Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_HAMMER)
-                {
-                    int Health = g_Config.m_WarHammerFixHealth;
-                    if(pTarget->GetRole() == ROLE_ENGINEER)
-                        Health *= 2;
-                    
-                    TakeFix(Health, CID);
-                }else if(Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_GUN)
-                {
-                    if(pTarget->GetPlayer()->GetTeam() == m_Team && pTarget->m_Armor)
-                    {
-                        pTarget->m_Armor--;
-                        m_GiveArmor++;
-                        GameServer()->CreateSound(m_Pos, SOUND_PICKUP_ARMOR);
-                        if(m_GiveArmor >= 10)
-                        {
-                            m_LaserArmor += 2;
-                            m_GiveArmor = 0;
-                            GameServer()->CreateSound(m_Pos, SOUND_RIFLE_FIRE);
-                            GameServer()->SendChatTarget(CID, _("Laser Armor: {int:Num}"), "Num", &m_LaserArmor, NULL);
-                        }
-                    }
-                    else if(pTarget->GetPlayer()->GetTeam() != m_Team)
-                    {
-                        if(m_LaserArmor)
-                        {
-                            m_GiveArmor--;
-                            if(m_GiveArmor < -5)
-                            {
-                                m_LaserArmor--;
-                                m_GiveArmor = 0;
-                                GameServer()->SendChatTarget(CID, _("Laser Armor: {int:Num}"), "Num", &m_LaserArmor, NULL);
-                            }
-                        }else
-                        {
-                            TakeDamage(2, CID);
-                        }
-                    }
-                }
-                pTarget->m_LastFixTick = Server()->Tick();
-            }
-            
-        }
-    }
+    OnDestory();
+    
+    OnNormal();
 }
 
 void CTower::Reset()

@@ -28,6 +28,9 @@ public:
 
 	void TakeDamage(int Damage, int From);
 	void TakeFix(int Health, int From);
+	void OnDestory();
+	void OnNormal();
+	void OnFix();
 
 	void UpdateState();
 
