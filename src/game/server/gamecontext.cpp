@@ -500,6 +500,11 @@ void CGameContext::OnTick()
 			m_apPlayers[i]->Tick();
 			m_apPlayers[i]->PostTick();
 		}
+		if(m_DmgSound[i])
+		{
+			CreateSoundGlobal(SOUND_HIT, i);
+			m_DmgSound[i] = false;
+		}
 	}
 
 	// update voting
@@ -1638,7 +1643,7 @@ void CGameContext::SetClientLanguage(int ClientID, const char *pLanguage)
 
 void CGameContext::SendDamageSound(int ClientID)
 {
-	CreateSoundGlobal(SOUND_CTF_GRAB_PL, ClientID);
+	m_DmgSound[ClientID] = true;
 	return;
 }
 

@@ -30,7 +30,7 @@ public:
 	void TakeFix(int Health, int From);
 	void OnDestory();
 	void OnNormal();
-	void OnFix();
+	void DoFix(int FixType, class CPlayer *pFrom);
 
 	void UpdateState();
 

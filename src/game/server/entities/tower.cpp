@@ -40,6 +40,8 @@ void CTower::TakeDamage(int Damage, int From)
 
     m_TowerHealth -= Damage;
 
+    GameServer()->SendDamageSound(From);
+
     if(m_TowerHealth <= 0)
     {
         m_DestoryTick = Server()->TickSpeed();
@@ -109,72 +111,56 @@ void CTower::OnNormal()
 
     if(m_LaserArmor && Server()->Tick() % (Server()->TickSpeed() * 20) == 0)
         m_LaserArmor--;
-
-    OnFix();
 }
 
-void CTower::OnFix()
+void CTower::DoFix(int FixType, CPlayer *pFrom)
 {
-    CCharacter *apEnts[MAX_CLIENTS];
-    int Num = GameServer()->m_World.FindEntities(m_Pos, m_ProximityRadius + 28.0f, (CEntity**)apEnts,
-                                                MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
-    for (int i = 0; i < Num; ++i)
+    switch (FixType)
     {
-        CCharacter *pTarget = apEnts[i];
-        CNetObj_PlayerInput Input = pTarget->GetInput();
-
-        int FixTimer = g_Config.m_WarFixTimer;
-
-        if(pTarget->GetRole() == ROLE_ENGINEER && pTarget->GetActiveWeapon() == WEAPON_GUN)
+    case FIXTYPE_UPGRADE:
         {
-            FixTimer /= 5;
-        }
-
-        if(Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_GUN)
-            pTarget->m_FireTeam = m_Team;
-
-        if((pTarget->m_LastFixTick + FixTimer <= Server()->Tick()) && pTarget->GetRole() == ROLE_ENGINEER)
-        {
-            int CID = pTarget->GetPlayer()->GetCID();
-            if(pTarget->GetPlayer()->GetTeam() == m_Team && Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_HAMMER)
+            pFrom->GetCharacter()->m_Armor--;
+            m_GiveArmor++;
+            GameServer()->CreateSound(m_Pos, SOUND_PICKUP_ARMOR);
+            if(m_GiveArmor >= 10)
             {
-                int Health = g_Config.m_WarHammerFixHealth;
-                
-                TakeFix(Health, CID);
-            }else if(Input.m_Fire&1 && pTarget->GetActiveWeapon() == WEAPON_GUN)
-            {
-                if(pTarget->GetPlayer()->GetTeam() == m_Team && pTarget->m_Armor)
-                {
-                    pTarget->m_Armor--;
-                    m_GiveArmor++;
-                    GameServer()->CreateSound(m_Pos, SOUND_PICKUP_ARMOR);
-                    if(m_GiveArmor >= 10)
-                    {
-                        m_LaserArmor += 2;
-                        m_GiveArmor = 0;
-                        GameServer()->CreateSound(m_Pos, SOUND_RIFLE_FIRE);
-                        GameServer()->SendChatTarget(CID, _("Laser Armor: {int:Num}"), "Num", &m_LaserArmor, NULL);
-                    }
-                }
-                else if(pTarget->GetPlayer()->GetTeam() != m_Team)
-                {
-                    if(m_LaserArmor)
-                    {
-                        m_GiveArmor--;
-                        if(m_GiveArmor < -5)
-                        {
-                            m_LaserArmor--;
-                            m_GiveArmor = 0;
-                            GameServer()->SendChatTarget(CID, _("Laser Armor: {int:Num}"), "Num", &m_LaserArmor, NULL);
-                        }
-                    }else
-                    {
-                        TakeDamage(2, CID);
-                    }
-                }
+                m_LaserArmor += 2;
+                m_GiveArmor = 0;
+                GameServer()->CreateSound(m_Pos, SOUND_RIFLE_FIRE);
+                GameServer()->SendChatTarget(pFrom->GetCID(), _("Laser Armor: {int:Num}"), "Num", &m_LaserArmor, NULL);
             }
-            pTarget->m_LastFixTick = Server()->Tick();
-        }
+        } break;
+    case FIXTYPE_HAMMERFIX:
+        {
+            int Health = g_Config.m_WarHammerFixHealth;
+            TakeFix(Health, pFrom->GetCID());
+        }break;
+    case FIXTYPE_ATTACK:
+        {
+            if(m_LaserArmor)
+            {
+                m_GiveArmor--;
+                if(m_GiveArmor < -5)
+                {
+                    m_LaserArmor--;
+                    m_GiveArmor = 0;
+                    GameServer()->SendChatTarget(pFrom->GetCID(), _("Laser Armor: {int:Num}"), "Num", &m_LaserArmor, NULL);
+                    for(int i = 0; i < MAX_CLIENTS; i ++)
+                    {
+                        if(!GameServer()->m_apPlayers[i])
+                            continue;
+
+                        if(GameServer()->m_apPlayers[i]->GetTeam() == m_Team && GameServer()->m_apPlayers[i]->GetRole() == ROLE_ENGINEER)
+                        {
+                            GameServer()->SendBroadcast_VL(_("Laser Armor: {int:Num}"), pFrom->GetCID(), "Num", &m_LaserArmor, NULL);
+                        }   
+                    }
+                }
+            }else
+            {
+                TakeDamage(2, pFrom->GetCID());
+            }
+        }break;
     }
 }
 

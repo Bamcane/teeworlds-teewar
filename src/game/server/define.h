@@ -27,4 +27,12 @@ enum SystemClientID
     NUM_CLIENTIDS,
 };
 
+enum FixType
+{
+    FIXTYPE_UPGRADE=0,
+    FIXTYPE_HAMMERFIX,
+    FIXTYPE_ATTACK,
+    NUM_FIXTYPES
+};
+
 #endif

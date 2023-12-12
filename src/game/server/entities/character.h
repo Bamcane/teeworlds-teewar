@@ -116,6 +116,7 @@ private:
 public:
 
 	int m_Health;
+	int m_MaxHealth;
 	int m_Armor;
 
 private:
@@ -146,8 +147,7 @@ public:
 	int GetActiveWeapon() {return m_ActiveWeapon; }
 	int GetRole();
 	int m_LastFixTick;
-	int m_FireTeam;// Engineer
-
+	vec2 m_FirePos;// Engineer
 };
 
 #endif

@@ -81,11 +81,12 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 	mem_zero(&m_SendCore, sizeof(m_SendCore));
 	mem_zero(&m_ReckoningCore, sizeof(m_ReckoningCore));
 
+	m_MaxHealth = 10;
+	if(GetRole() == ROLE_SNIPER)
+		m_MaxHealth = 5;
+
 	GameServer()->m_World.InsertEntity(this);
 	m_Alive = true;
-
-	m_FireTeam = -1;// Enginner
-
 
 	GameServer()->m_pController->OnCharacterSpawn(this);
 
@@ -255,7 +256,7 @@ void CCharacter::HandleWeaponSwitch()
 
 void CCharacter::FireWeapon()
 {
-	if(m_ReloadTimer != 0)
+	if(m_ReloadTimer != 0 && !(GetRole() == ROLE_ENGINEER && m_ActiveWeapon == WEAPON_GUN))
 		return;
 
 	DoWeaponSwitch();
@@ -353,7 +354,7 @@ void CCharacter::FireWeapon()
 				Hits++;
 			}
 
-			CTower *pTower = GameServer()->m_pController->m_apTeamTower[(m_pPlayer->GetTeam() ? TEAM_RED : TEAM_BLUE)];
+			CTower *pTower = GameServer()->m_pController->m_apTeamTower[!m_pPlayer->GetTeam()];
 
 			// Attack the tower, if random 1
 			if((distance(pTower->m_Pos, ProjStartPos) < m_ProximityRadius + pTower->m_ProximityRadius) && (GetRole() == ROLE_SOLDIER || random_int(0, 1)))
@@ -362,8 +363,14 @@ void CCharacter::FireWeapon()
 				GameServer()->CreateHammerHit(ProjStartPos);
 			}
 
+			CTower* pSelfTeam = GameServer()->m_pController->m_apTeamTower[m_pPlayer->GetTeam()];
+			if(GetRole() == ROLE_ENGINEER && distance(ProjStartPos, pSelfTeam->m_Pos) < m_ProximityRadius + pSelfTeam->m_ProximityRadius)
+			{
+				pSelfTeam->DoFix(FIXTYPE_HAMMERFIX, GetPlayer());
+				m_ReloadTimer = g_Config.m_WarFixTimer;
+			}
 			// if we Hit anything, we have to wait for the reload
-			if(Hits)
+			else if(Hits)
 				m_ReloadTimer = Server()->TickSpeed()/3;
 
 		} break;
@@ -372,7 +379,24 @@ void CCharacter::FireWeapon()
 		{
 			if(GetRole() == ROLE_ENGINEER)
 			{
-				GameServer()->CreateSound(m_Pos, SOUND_PLAYER_JUMP);
+				{
+					GameServer()->CreateSound(m_Pos, SOUND_PLAYER_JUMP);
+					float Distance = min(distance(m_Pos, vec2(m_Pos.x + m_Input.m_TargetX, m_Pos.y + m_Input.m_TargetY)), 320.0f);
+					m_FirePos = m_Pos + Direction * Distance;
+				}
+				if(m_ReloadTimer)
+					return;
+				CTower* pSelfTeam = GameServer()->m_pController->m_apTeamTower[m_pPlayer->GetTeam()];
+				CTower* pOtherTeam = GameServer()->m_pController->m_apTeamTower[!m_pPlayer->GetTeam()];
+				if(m_Armor && distance(m_FirePos, pSelfTeam->m_Pos) < pSelfTeam->m_ProximityRadius)
+				{
+					pSelfTeam->DoFix(FIXTYPE_UPGRADE, GetPlayer());
+				}
+				if(distance(m_FirePos, pOtherTeam->m_Pos) < pOtherTeam->m_ProximityRadius)
+				{
+					pOtherTeam->DoFix(FIXTYPE_ATTACK, GetPlayer());
+				}
+				m_ReloadTimer = g_Config.m_WarFixTimer / 5;
 				return;
 			}
 
@@ -477,7 +501,7 @@ void CCharacter::HandleWeapons()
 		if(!m_RoleAmmoRegen)
 		{
 			if(GetRole() == ROLE_SNIPER)
-				m_aWeapons[WEAPON_RIFLE].m_Ammo = 10;
+				m_aWeapons[WEAPON_RIFLE].m_Ammo = 5;
 		}
 	}
 
@@ -607,7 +631,6 @@ void CCharacter::Tick()
 		Die(m_pPlayer->GetCID(), WEAPON_WORLD);
 	}
 
-	m_FireTeam = -1;
 
 	// handle Weapons
 	HandleWeapons();
@@ -716,9 +739,9 @@ void CCharacter::TickPaused()
 
 bool CCharacter::IncreaseHealth(int Amount)
 {
-	if(m_Health >= 10)
+	if(m_Health >= m_MaxHealth)
 		return false;
-	m_Health = clamp(m_Health+Amount, 0, 10);
+	m_Health = clamp(m_Health+Amount, 0, m_MaxHealth);
 	return true;
 }
 
@@ -927,19 +950,17 @@ void CCharacter::Snap(int SnappingClient)
 
 	pCharacter->m_PlayerFlags = GetPlayer()->m_PlayerFlags;
 
-	if(GetRole() == ROLE_ENGINEER && m_FireTeam > -1)
+	if(GetRole() == ROLE_ENGINEER && m_ActiveWeapon == WEAPON_GUN && m_Input.m_Fire&1)
 	{
 		CNetObj_Laser *pLaser = (CNetObj_Laser *)Server()->SnapNewItem(NETOBJTYPE_LASER, m_LaserID, sizeof(CNetObj_Laser));
 
 		if(!pLaser)
 			return;
 
-		vec2 TowerPos = GameServer()->m_pController->m_apTeamTower[m_FireTeam]->m_Pos;
-
 		pLaser->m_FromX = m_Pos.x;
 		pLaser->m_FromY = m_Pos.y;
-		pLaser->m_X = TowerPos.x;
-		pLaser->m_Y = TowerPos.y;
+		pLaser->m_X = m_FirePos.x;
+		pLaser->m_Y = m_FirePos.y;
 		pLaser->m_StartTick = Server()->Tick();
 	}
 }
