@@ -51,6 +51,7 @@ void CTower::TakeDamage(int Damage, int From)
         {
             pChr->SetEmote(EMOTE_HAPPY, Server()->Tick()+m_DestoryTick);
         }
+        GameServer()->CreateSoundGlobal(SOUND_CTF_GRAB_PL);
         return;
     }
 
