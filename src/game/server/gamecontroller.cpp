@@ -14,7 +14,7 @@ CGameController::CGameController(class CGameContext *pGameServer)
 {
 	m_pGameServer = pGameServer;
 	m_pServer = m_pGameServer->Server();
-	m_pGameType = "Teewar";
+	m_pGameType = "Teewar  idm";
 
 	//
 	DoWarmup(0);
